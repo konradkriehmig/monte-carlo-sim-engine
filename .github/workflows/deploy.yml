@@ -14,6 +14,7 @@ on:
           - 3-storage
           - 4-database
           - 5-scompute
+          - all
 
 jobs:
   rg:
@@ -34,12 +35,13 @@ jobs:
         with:
           inlineScript: |
             az group create \
-              --name RG-backtest-enginge-distributed \
+              --name RG-backtest-engine-distributed \
               --location eastus \
               --tags project=backtest
 
   network:
     if: ${{ github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == '2-network' }}
+    needs: rg
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -50,22 +52,13 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Create Resource Group
-        uses: azure/cli@v1
-        with:
-          inlineScript: |
-            az group create \
-              --name ${{ env.RESOURCE_GROUP }} \
-              --location ${{ env.LOCATION }} \
-              --tags project=backtest environment=dev
-
       - name: Deploy Network
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
-          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          resourceGroupName: RG-backtest-engine-distributed
           template: ./infra/network.json
-          parameters: location=${{ env.LOCATION }}
+          parameters: location=eastus
           deploymentName: network
 
   # Storage
@@ -86,9 +79,9 @@ jobs:
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
-          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          resourceGroupName: RG-backtest-engine-distributed
           template: ./infra/storage.json
-          parameters: location=${{ env.LOCATION }} storageAccountName=${{ secrets.STORAGE_ACCOUNT_NAME }}
+          parameters: location=eastus storageAccountName=${{ secrets.STORAGE_ACCOUNT_NAME }}
           deploymentName: storage
 
   # Database
@@ -109,9 +102,9 @@ jobs:
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
-          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          resourceGroupName: RG-backtest-engine-distributed
           template: ./infra/database.json
-          parameters: location=${{ env.LOCATION }} administratorPassword=${{ secrets.POSTGRES_PASSWORD }}
+          parameters: location=eastus administratorPassword=${{ secrets.POSTGRES_PASSWORD }}
           deploymentName: database
 
   # Compute
@@ -132,9 +125,9 @@ jobs:
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
-          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          resourceGroupName: RG-backtest-engine-distributed
           template: ./infra/compute.json
-          parameters: location=${{ env.LOCATION }} adminPublicKey="${{ secrets.SSH_PUBLIC_KEY }}" storageAccountName=${{ secrets.STORAGE_ACCOUNT_NAME }} transformVmSize=Standard_D4s_v3 vmssVmSize=Standard_D4s_v3
+          parameters: location=eastus adminPublicKey="${{ secrets.SSH_PUBLIC_KEY }}" storageAccountName=${{ secrets.STORAGE_ACCOUNT_NAME }} transformVmSize=Standard_D4s_v3 vmssVmSize=Standard_D4s_v3
           deploymentName: compute
 
       - name: Assign Storage Roles to VMSS
@@ -144,17 +137,17 @@ jobs:
             # Get VMSS principal ID
             PRINCIPAL_ID=$(az vmss identity show \
               --name backtest-workers \
-              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --resource-group RG-backtest-engine-distributed \
               --query principalId -o tsv)
             
             # Assign Blob Data Contributor
             az role assignment create \
               --assignee $PRINCIPAL_ID \
               --role "Storage Blob Data Contributor" \
-              --scope /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Storage/storageAccounts/${{ secrets.STORAGE_ACCOUNT_NAME }}
+              --scope /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/RG-backtest-engine-distributed/providers/Microsoft.Storage/storageAccounts/${{ secrets.STORAGE_ACCOUNT_NAME }}
             
             # Assign Queue Data Contributor
             az role assignment create \
               --assignee $PRINCIPAL_ID \
               --role "Storage Queue Data Contributor" \
-              --scope /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Storage/storageAccounts/${{ secrets.STORAGE_ACCOUNT_NAME }}
+              --scope /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/RG-backtest-engine-distributed/providers/Microsoft.Storage/storageAccounts/${{ secrets.STORAGE_ACCOUNT_NAME }}
