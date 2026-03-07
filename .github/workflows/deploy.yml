@@ -104,7 +104,7 @@ jobs:
           scope: resourcegroup
           resourceGroupName: RG-backtest-engine-distributed
           template: ./infra/database.json
-          parameters: location=eastus administratorPassword=${{ secrets.POSTGRES_PASSWORD }} servername=PG-DB-bed
+          parameters: location=eastus administratorPassword=${{ secrets.POSTGRES_PASSWORD }} serverName=PG-DB-bed
           deploymentName: database
 
   # Compute
