@@ -1,4 +1,4 @@
-## ETF Fair Value Monte Carlo Engine (`etf_fairvalue/`)
+## ETF Fair Value Monte Carlo Engine
 
 Estimates the **fair value of the XLK ETF** by running correlated Geometric
 Brownian Motion (GBM) simulations across all ~70 constituents using a
