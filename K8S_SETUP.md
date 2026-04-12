@@ -1,7 +1,4 @@
-
----
-
-# ETF Fair Value Monte Carlo Engine — Azure K8s Guide
+## Initial Setup Guide
 
 ### A1. Install local tools
 
