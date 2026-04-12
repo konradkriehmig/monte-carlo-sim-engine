@@ -39,6 +39,9 @@ spec:
           configMap:
             name: config-bundle
         - name: results-volume
-          emptyDir: {}
+          azureFile:
+            secretName: azure-storage
+            shareName: results
+            readOnly: false
       restartPolicy: Never
   backoffLimit: 5
