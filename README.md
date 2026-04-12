@@ -25,4 +25,8 @@ The XLK spread is also vulnerable to external shocks but less so than the expect
 
 <img width="892" height="897" alt="image" src="https://github.com/user-attachments/assets/06288147-901e-4096-bf9e-22d6b9305b50" />
 
+### Performance
+
+I initially wanted to create a system that handles tasks in the cloud faster than on my laptop. However, I am using a decently powerful laptop with 12 amd cores and I have limited access to SKUs (only to D series for regular daily work). Therefore, I was not able to speed up the parallelism on my local laptop. 
+
 Got to the setup guide: https://github.com/konradkriehmig/monte-carlo-sim-engine/blob/main/K8S_SETUP_AND_USER_GUIDE.md
