@@ -2,27 +2,7 @@
 
 ## Architecture Overview
 
-```
-Local machine                          Azure
-┌─────────────────┐     push      ┌──────────────────────────────┐
-│ Docker Desktop  │──────────────▶│ Azure Container Registry     │
-│ (build image)   │               │ (stores container image)     │
-└─────────────────┘               └──────────┬───────────────────┘
-                                             │ pull
-┌─────────────────┐   kubectl     ┌──────────▼───────────────────┐
-│ fetch.py        │──────────────▶│ Azure Kubernetes Service     │
-│ (config bundle) │  configmap    │                              │
-└─────────────────┘               │  ┌─────┐ ┌─────┐ ┌─────┐   │
-                                  │  │pod 0│ │pod 1│ │ ... │   │
-                                  │  └─────┘ └─────┘ └─────┘   │
-                                  │  100 pods × 10,000 paths    │
-                                  └──────────────────────────────┘
-                                             │
-┌─────────────────┐   kubectl     ───────────┘
-│ aggregate.py    │◀── logs/copy
-│ (combine & plot)│
-└─────────────────┘
-```
+<img width="839" height="1144" alt="image" src="https://github.com/user-attachments/assets/4785ad50-00e2-4df0-b531-59f691398888" />
 
 ---
 
@@ -241,3 +221,13 @@ kubectl delete job etf-mc-job
 | `ImagePullBackOff` | Same as ErrImagePull, just K8s backing off retries | Fix the pull error, delete job, resubmit |
 | Pods stuck in `Pending` | Not enough resources on nodes | Reduce `parallelism` or add nodes |
 | `CrashLoopBackOff` | Worker code is crashing | Check `kubectl logs <pod>` for Python errors |
+
+### Key constants
+
+| Constant | Value |
+|---|---|
+| `TRADING_DAYS_PER_YEAR` | 252 |
+| Default `horizon_days` | 5 trading days |
+| Default `num_paths` per worker | 10,000 |
+| Default number of workers | 100 |
+| Total paths | 1,000,000 |
