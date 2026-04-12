@@ -1,5 +1,6 @@
 ## User Guide (after installation)
 
+### Run workers
 - make sure cluster is running
 - fetch data
 - Upload config to K8s
@@ -34,24 +35,17 @@ kubectl get job etf-mc-job
 kubectl get pods --watch
 ```
 
-### B5. Retrieve results
-
+### Retrieve results
 Results should be stored in Azure File Share. Pull them to your local laptop:
-´´´
+```
 az storage file download-batch --destination ./results --source results --account-name samontecarloengine --account-key <your-key>
-´´´
-
-
-
+```
 
 Output:
 - `results/summary_stats.json` — mean, median, std, percentiles, premium/discount
 - `results/nav_distribution.png` — histogram with KDE overlay
 
-### B7. Clean up the job
-
-After retrieving results, delete the job to free resources:
-
-```powershell
+Delete job to free capacity:
+```
 kubectl delete job etf-mc-job
 ```
