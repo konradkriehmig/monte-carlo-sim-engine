@@ -26,7 +26,7 @@ kubectl create configmap config-bundle --from-file=config/config_bundle.npz --fr
 - delete old job and push the new one to the workers
 ```
 kubectl delete job etf-mc-worker --ignore-not-found
-kubectl apply -f etf_fairvalue/k8s/job.yaml
+kubectl apply -f k8s/job.yaml
 ```
 - monitor progress
 ```
