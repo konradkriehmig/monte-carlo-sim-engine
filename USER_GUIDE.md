@@ -35,11 +35,12 @@ kubectl get job etf-mc-job
 kubectl get pods --watch
 ```
 
-### Retrieve results
+### Retrieve & analyse results
 Results should be stored in Azure File Share. Pull them to your local laptop:
 ```
 az storage file download-batch --destination ./results --source results --account-name <storage-account-name> --account-key <your-key>
 ```
+- run the aggregator file
 
 Output:
 - `results/summary_stats.json` — mean, median, std, percentiles, premium/discount
