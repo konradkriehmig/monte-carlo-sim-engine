@@ -38,7 +38,7 @@ kubectl get pods --watch
 ### Retrieve results
 Results should be stored in Azure File Share. Pull them to your local laptop:
 ```
-az storage file download-batch --destination ./results --source results --account-name samontecarloengine --account-key <your-key>
+az storage file download-batch --destination ./results --source results --account-name <storage-account-name> --account-key <your-key>
 ```
 
 Output:
