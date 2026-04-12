@@ -1,3 +1,89 @@
+## User Guide (after installation)
+
+### 0 make sure cluster is running
+
+### 1 fetch data
+
+### 2 Upload config to K8s
+
+Delete any old config and create a fresh one:
+
+- navigate to project folder
+- login to Azure on your terminal
+- connect AKS cluster to access confing file
+```
+az aks get-credentials --resource-group <resource-group-name> --name <aks-cluster-name>
+```
+
+```
+kubectl delete configmap config-bundle --ignore-not-found
+kubectl create configmap config-bundle --from-file=config/config_bundle.npz --from-file=config/config_meta.json
+```
+
+Verify:
+
+```powershell
+kubectl get configmap config-bundle
+```
+
+Should show `DATA: 2`.
+
+### B3. Submit the simulation job
+
+```powershell
+kubectl apply -f k8s/job.yaml
+```
+
+### B4. Monitor progress
+
+```powershell
+# Overall progress
+kubectl get job etf-mc-job
+
+# Watch individual pods
+kubectl get pods --watch
+
+# Check logs of a specific worker
+kubectl logs etf-mc-job-0-<pod-suffix>
+```
+
+Wait until `COMPLETIONS` shows `100/100`.
+
+### B5. Retrieve results
+
+Since results are stored in emptyDir (temporary pod storage), you need to pull them before cleanup. From a running or completed pod:
+
+```powershell
+# List completed pods
+kubectl get pods --field-selector=status.phase=Succeeded
+
+# Copy results from a pod (while it still exists)
+kubectl cp <pod-name>:/data/results ./results
+```
+
+> **Note:** emptyDir volumes are lost when pods are deleted. Pull results
+> promptly after the job completes.
+
+### B6. Aggregate results locally
+
+```powershell
+python -m etf_fairvalue.aggregate
+```
+
+Output:
+- `results/summary_stats.json` — mean, median, std, percentiles, premium/discount
+- `results/nav_distribution.png` — histogram with KDE overlay
+
+### B7. Clean up the job
+
+After retrieving results, delete the job to free resources:
+
+```powershell
+kubectl delete job etf-mc-job
+```
+
+---
+
 # ETF Fair Value Monte Carlo Engine — Azure K8s Guide
 
 ## Architecture Overview
@@ -104,90 +190,6 @@ You should see your nodes listed with status `Ready`.
 
 ---
 
-## Part B — User Guide (daily workflow)
-
-### B1. Generate the config bundle
-
-Run the data fetch step locally. This downloads XLK holdings, price history, and computes the covariance matrix:
-
-```powershell
-python -m etf_fairvalue.fetch
-```
-
-Output: `config/config_bundle.npz` and `config/config_meta.json`
-
-### B2. Upload config to K8s
-
-Delete any old config and create a fresh one:
-
-```powershell
-kubectl delete configmap config-bundle --ignore-not-found
-kubectl create configmap config-bundle --from-file=config/config_bundle.npz --from-file=config/config_meta.json
-```
-
-Verify:
-
-```powershell
-kubectl get configmap config-bundle
-```
-
-Should show `DATA: 2`.
-
-### B3. Submit the simulation job
-
-```powershell
-kubectl apply -f k8s/job.yaml
-```
-
-### B4. Monitor progress
-
-```powershell
-# Overall progress
-kubectl get job etf-mc-job
-
-# Watch individual pods
-kubectl get pods --watch
-
-# Check logs of a specific worker
-kubectl logs etf-mc-job-0-<pod-suffix>
-```
-
-Wait until `COMPLETIONS` shows `100/100`.
-
-### B5. Retrieve results
-
-Since results are stored in emptyDir (temporary pod storage), you need to pull them before cleanup. From a running or completed pod:
-
-```powershell
-# List completed pods
-kubectl get pods --field-selector=status.phase=Succeeded
-
-# Copy results from a pod (while it still exists)
-kubectl cp <pod-name>:/data/results ./results
-```
-
-> **Note:** emptyDir volumes are lost when pods are deleted. Pull results
-> promptly after the job completes.
-
-### B6. Aggregate results locally
-
-```powershell
-python -m etf_fairvalue.aggregate
-```
-
-Output:
-- `results/summary_stats.json` — mean, median, std, percentiles, premium/discount
-- `results/nav_distribution.png` — histogram with KDE overlay
-
-### B7. Clean up the job
-
-After retrieving results, delete the job to free resources:
-
-```powershell
-kubectl delete job etf-mc-job
-```
-
----
 
 ## Quick Reference
 
