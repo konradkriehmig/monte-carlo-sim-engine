@@ -15,6 +15,8 @@ Kubernetes (AKS) cluster via Indexed Job pattern, where the number of simulated 
 
 <img width="892" height="897" alt="image" src="https://github.com/user-attachments/assets/06288147-901e-4096-bf9e-22d6b9305b50" />
 
+### Results
 
+<img width="885" height="437" alt="image" src="https://github.com/user-attachments/assets/690bd7b6-460a-4234-a5d6-0f6bad3035a2" />
 
 Got to the setup guide: https://github.com/konradkriehmig/monte-carlo-sim-engine/blob/main/K8S_SETUP_AND_USER_GUIDE.md
