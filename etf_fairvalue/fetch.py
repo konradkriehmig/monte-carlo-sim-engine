@@ -16,7 +16,6 @@ Usage:
 from __future__ import annotations
 
 import json
-import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -25,10 +24,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yfinance as yf
-
-from etf_fairvalue.logging_config import setup_logging
-
-logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -81,10 +76,10 @@ def get_holdings() -> pd.DataFrame:
     """Return DataFrame[ticker, weight], trying yfinance first then CSV fallback."""
     try:
         df = _holdings_from_yfinance()
-        logger.info("Loaded %d holdings from yfinance", len(df))
+        print(f"[fetch] Loaded {len(df)} holdings from yfinance")
         return df
     except Exception as exc:
-        logger.warning("yfinance holdings failed (%s); falling back to CSV at %s", exc, HOLDINGS_CSV)
+        print(f"[fetch] yfinance holdings failed ({exc}); falling back to CSV at {HOLDINGS_CSV}")
         return _holdings_from_csv(HOLDINGS_CSV)
 
 # ---------------------------------------------------------------------------
@@ -97,7 +92,7 @@ def fetch_price_history(tickers: list[str]) -> pd.DataFrame:
     Returns a DataFrame with tickers as columns and dates as index.
     Drops any ticker for which no data was returned.
     """
-    logger.info("Downloading 1y of daily closes for %d tickers …", len(tickers))
+    print(f"[fetch] Downloading 1y of daily closes for {len(tickers)} tickers …")
     raw = yf.download(
         tickers,
         period=LOOKBACK_PERIOD,
@@ -112,7 +107,7 @@ def fetch_price_history(tickers: list[str]) -> pd.DataFrame:
     closes = closes.dropna(axis=1, how="all")
     missing = set(tickers) - set(closes.columns)
     if missing:
-        logger.warning("No data for %s; dropping from universe", missing)
+        print(f"[fetch] Warning: no data for {missing}; dropping from universe")
     return closes
 
 
@@ -141,7 +136,8 @@ def compute_stats(
     cov_ann = daily_cov * TRADING_DAYS_PER_YEAR     # annualised
     sigma = np.sqrt(np.diag(cov_ann))               # annualised vol
 
-    logger.info("Computed stats for %d tickers; avg μ=%.4f, avg σ=%.4f", n, mu.mean(), sigma.mean())
+    print(f"[fetch] Computed stats for {n} tickers; "
+          f"avg μ={mu.mean():.4f}, avg σ={sigma.mean():.4f}")
     return mu, sigma, cov_ann, tickers
 
 
@@ -151,7 +147,7 @@ def compute_stats(
 
 def fetch_current_prices(tickers: list[str]) -> np.ndarray:
     """Return array of latest available closing prices for each ticker."""
-    logger.info("Fetching latest prices …")
+    print("[fetch] Fetching latest prices …")
     raw = yf.download(tickers, period="5d", auto_adjust=True, progress=False)
     if isinstance(raw.columns, pd.MultiIndex):
         closes = raw["Close"]
@@ -169,7 +165,7 @@ def fetch_xlk_market_price() -> float:
     else:
         closes = raw[["Close"]] if "Close" in raw.columns else raw
     price = float(closes.ffill().iloc[-1].values[0])
-    logger.info("XLK market price: $%.2f", price)
+    print(f"[fetch] XLK market price: ${price:.2f}")
     return price
 
 
@@ -200,7 +196,7 @@ def save_config_bundle(
         sigma=sigma,
         cov_matrix=cov_matrix,
     )
-    logger.info("Saved arrays → %s", npz_path)
+    print(f"[fetch] Saved arrays → {npz_path}")
 
     meta = {
         "tickers": tickers,
@@ -211,7 +207,7 @@ def save_config_bundle(
     meta_path = config_dir / "config_meta.json"
     with open(meta_path, "w") as fh:
         json.dump(meta, fh, indent=2)
-    logger.info("Saved metadata → %s", meta_path)
+    print(f"[fetch] Saved metadata → {meta_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +215,6 @@ def save_config_bundle(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    setup_logging()
     start = time.time()
 
     # 1. Holdings
@@ -259,7 +254,7 @@ def main() -> None:
     )
 
     elapsed = time.time() - start
-    logger.info("Done in %.1fs. Config bundle written to %s/", elapsed, CONFIG_DIR)
+    print(f"[fetch] Done in {elapsed:.1f}s. Config bundle written to {CONFIG_DIR}/")
 
 
 if __name__ == "__main__":
