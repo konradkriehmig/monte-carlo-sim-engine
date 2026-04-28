@@ -11,13 +11,20 @@ Usage:
 """
 
 from __future__ import annotations
+
 import argparse
 import json
+import logging
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+
+from etf_fairvalue.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -41,8 +48,7 @@ def load_all_batches(results_dir: Path) -> np.ndarray:
         )
     frames = [pd.read_parquet(p) for p in parquet_files]
     all_data = pd.concat(frames, ignore_index=True)
-    print(f"[aggregate] Loaded {len(parquet_files)} batch files, "
-          f"{len(all_data):,} total NAV values")
+    logger.info("Loaded %d batch files, %s total NAV values", len(parquet_files), f"{len(all_data):,}")
     return all_data["nav"].values
 
 
@@ -119,7 +125,7 @@ def plot_distribution(
         x_grid = np.linspace(nav_values.min(), nav_values.max(), 500)
         ax.plot(x_grid, kde(x_grid), color="#4C72B0", linewidth=2)
     except Exception:
-        pass  # scipy optional; fall back to histogram only
+        logger.debug("scipy not available; skipping KDE overlay")
 
     # Vertical lines
     ax.axvline(mean_nav, color="#DD8452", linewidth=2, linestyle="-",
@@ -143,7 +149,7 @@ def plot_distribution(
     plt.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
-    print(f"[aggregate] Plot saved → {out_path}")
+    logger.info("Plot saved → %s", out_path)
 
 
 # ---------------------------------------------------------------------------
@@ -185,11 +191,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Directory with batch_*.parquet files")
     parser.add_argument("--config-dir", type=Path, default=Path("config"),
                         help="Directory with config_meta.json")
+    parser.add_argument("--log-level", default="info",
+                        choices=["debug", "info", "warning", "error"],
+                        help="Logging verbosity (default: info)")
+    parser.add_argument("--log-file", type=Path, default=None,
+                        help="Optional file path for log output (appended)")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    setup_logging(level=args.log_level, log_file=args.log_file)
 
     # 1. Load all batch results
     nav_values = load_all_batches(args.results_dir)
@@ -197,7 +209,7 @@ def main(argv: list[str] | None = None) -> None:
     # 2. Load XLK market price (optional)
     xlk_price = load_xlk_price(args.config_dir)
     if xlk_price is not None:
-        print(f"[aggregate] XLK market price from config: ${xlk_price:.2f}")
+        logger.info("XLK market price from config: $%.2f", xlk_price)
 
     # 3. Compute summary stats
     summary = compute_summary(nav_values, xlk_price)
@@ -206,7 +218,7 @@ def main(argv: list[str] | None = None) -> None:
     stats_path = args.results_dir / STATS_FILENAME
     with open(stats_path, "w") as fh:
         json.dump(summary, fh, indent=2)
-    print(f"[aggregate] Summary stats → {stats_path}")
+    logger.info("Summary stats → %s", stats_path)
 
     # 5. Plot
     plot_path = args.results_dir / PLOT_FILENAME

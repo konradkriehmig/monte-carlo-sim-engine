@@ -21,12 +21,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from etf_fairvalue.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -67,8 +72,10 @@ def load_config(config_dir: Path) -> dict:
     # ---------------------------------------------------------------------------
     raw_nav = np.dot(weights, current_prices)
     nav_scale_factor = xlk_market_price / raw_nav
-    print(f"[worker] NAV scale factor: {nav_scale_factor:.6f} "
-          f"(raw weighted avg = ${raw_nav:.2f}, XLK = ${xlk_market_price:.2f})")
+    logger.info(
+        "NAV scale factor: %.6f (raw weighted avg = $%.2f, XLK = $%.2f)",
+        nav_scale_factor, raw_nav, xlk_market_price,
+    )
 
     return {
         "tickers": meta["tickers"],
@@ -98,9 +105,12 @@ def cholesky_decompose(cov_matrix: np.ndarray) -> np.ndarray:
     try:
         L = np.linalg.cholesky(cov_matrix)
     except np.linalg.LinAlgError:
-        # Regularise with a small nugget
         n = cov_matrix.shape[0]
         nugget = 1e-8 * np.trace(cov_matrix) / n
+        logger.warning(
+            "Covariance matrix not positive-definite; adding nugget=%.2e for regularisation",
+            nugget,
+        )
         L = np.linalg.cholesky(cov_matrix + nugget * np.eye(n))
     return L
 
@@ -210,14 +220,13 @@ def write_results(nav_values: np.ndarray, results_dir: Path, batch_id: int) -> P
 
 
 def log_summary(nav_values: np.ndarray, batch_id: int, elapsed: float) -> None:
-    """Print summary statistics for this batch."""
+    """Log summary statistics for this batch."""
     p5, p25, p50, p75, p95 = np.percentile(nav_values, [5, 25, 50, 75, 95])
-    print(
-        f"[worker] batch={batch_id} | n={len(nav_values):,} paths | "
-        f"mean={nav_values.mean():.4f} | median={p50:.4f} | "
-        f"std={nav_values.std():.4f} | "
-        f"p5={p5:.4f} | p95={p95:.4f} | "
-        f"elapsed={elapsed:.2f}s"
+    logger.info(
+        "batch=%d | n=%s paths | mean=%.4f | median=%.4f | std=%.4f | "
+        "p5=%.4f | p95=%.4f | elapsed=%.2fs",
+        batch_id, f"{len(nav_values):,}",
+        nav_values.mean(), p50, nav_values.std(), p5, p95, elapsed,
     )
 
 
@@ -243,11 +252,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Directory for output parquet files")
     parser.add_argument("--use-loop", action="store_true",
                         help="Use loop-based simulation instead of vectorised")
+    parser.add_argument("--log-level", default="info",
+                        choices=["debug", "info", "warning", "error"],
+                        help="Logging verbosity (default: info)")
+    parser.add_argument("--log-file", type=Path, default=None,
+                        help="Optional file path for log output (appended)")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    setup_logging(level=args.log_level, log_file=args.log_file)
 
     # Allow K8s JOB_COMPLETION_INDEX to override batch-id / seed
     k8s_index = os.environ.get("JOB_COMPLETION_INDEX")
@@ -259,22 +274,21 @@ def main(argv: list[str] | None = None) -> None:
     seed = args.seed if args.seed is not None else args.batch_id
     rng = np.random.default_rng(seed)
 
-    print(
-        f"[worker] Starting batch={args.batch_id} | "
-        f"paths={args.num_paths:,} | horizon={args.horizon_days}d | seed={seed}"
+    logger.info(
+        "Starting batch=%d | paths=%s | horizon=%dd | seed=%s",
+        args.batch_id, f"{args.num_paths:,}", args.horizon_days, seed,
     )
 
     # 1. Load config
     cfg = load_config(args.config_dir)
-    print(
-        f"[worker] Config loaded: {cfg['n_tickers']} tickers, "
-        f"XLK=${cfg['xlk_market_price']:.2f} "
-        f"(generated {cfg.get('generated_utc', 'unknown')})"
+    logger.info(
+        "Config loaded: %d tickers, XLK=$%.2f (generated %s)",
+        cfg["n_tickers"], cfg["xlk_market_price"], cfg.get("generated_utc", "unknown"),
     )
 
     # 2. Cholesky decomposition (once per worker)
     L = cholesky_decompose(cfg["cov_matrix"])
-    print(f"[worker] Cholesky decomposition complete — L shape {L.shape}")
+    logger.info("Cholesky decomposition complete — L shape %s", L.shape)
 
     # 3. Simulate
     t0 = time.perf_counter()
@@ -297,7 +311,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # 5. Write output
     out_path = write_results(nav_values, args.results_dir, args.batch_id)
-    print(f"[worker] Results written → {out_path}")
+    logger.info("Results written → %s", out_path)
 
 
 if __name__ == "__main__":
